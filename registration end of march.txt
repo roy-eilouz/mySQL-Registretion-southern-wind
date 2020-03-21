@@ -1,0 +1,471 @@
+import MySQLdb
+
+
+###Multipale databases
+
+bases = {1: 'Tables' , 2: 'Digit'}
+
+###utility function ###
+
+def connect():
+    con = MySQLdb.connect(...)
+    cursor = con.cursor();
+    out = [con , cursor]
+    return out;
+
+def addSystem(system):
+    con , cursor = connect()
+    cursor.execute("SELECT system From Systems WHERE system = %s ", [system])
+    row = cursor.rowcount
+    if row == 0:
+        cursor.execute("INSERT INTO Systems (system) VALUES(%s)" , [system])
+    con.commit()
+    con.close()
+
+def sysToNum(system):
+    try:
+        con , cursor = connect()
+        cursor.execute("SELECT systemNum FROM Systems WHERE system = %s" , [system])
+        sys = cursor.fetchall()
+        out = sys[0][0]
+        return out
+    finally:
+        con.close()
+
+
+def numToSys(num):
+    try:
+        con , cursor = connect()
+        cursor.execute("SELECT system FROM Systems WHERE systemNum = %s" , [num])
+        number = cursor.fetchall()
+        out = number[0][0]
+        return out
+    finally:
+        con.close()
+
+#database managment###
+
+def aNewBeginning():
+    con , cursor = connect()
+    cursor.execute("CREATE TABLE IF NOT EXISTS `Tables` (`... );
+    con.close()
+
+def onTheGrid():
+    con , cursor = connect()
+    cursor.execute("CREATE TABLE IF NOT EXISTS `Digit` (`... );
+    con.close()
+
+def offTheGrid(password):
+    if password == ...
+        con , cursor = connect()
+        cursor.execute("DROP TABLE Digit")
+        con.close()
+
+def systemsTable():
+    con , cursor = connect()
+    cursor.execute("CREATE TABLE IF NOT EXISTS `Systems` (`systemNum` int AUTO_INCREMENT, `system` varchar(100) UNIQUE, PRIMARY KEY (`systemNum`) )" );
+    cursor.execute("INSERT INTO Systems (system) VALUES (%s)" , ["D&D5"])
+    con.commit()
+    con.close()
+
+def theRealDeal(password):
+    if password == ...
+        con , cursor = connect()
+        cursor.execute("DROP TABLE Tables")
+        cursor.execute("DROP TABLE Systems")
+        offTheGrid("Restart?")
+        aNewBeginning()
+        systemsTable()
+        onTheGrid()
+        con.close()
+
+
+###getters###
+
+def getSystems():
+    con , cursor = connect()
+    cursor.execute("SELECT * FROM Systems")
+    systems = cursor.fetchall()
+    out = dict(systems)
+    con.close()
+    return out
+
+def getActive(DB = 1):
+    try:
+        con , cursor = connect()
+        q = "SELECT adventureName, teaser, dm , style , minLevel , maxLevel , numOfPlayers, system, time FROM " + bases[DB] + " WHERE active = %s AND isFull = %s ORDER BY minLevel"
+        cursor.execute(q , [1,0]);
+        ActiveGames = cursor.fetchall();
+        out = []
+        for ag in ActiveGames:
+            if ag[7] == "0":
+                out.append({'name' : ag[0],
+                   'teaser' : ag[1],
+                   'DM' : ag[2],
+                   'style' : ag[3],
+                   'minLevel' : ag[4],
+                   'maxLevel' : ag[5],
+                   'numOfPlayers' : ag[6],
+                   'system' : "D&D5",
+                   'time' : ag[8]}
+                   )
+            else:
+                sys = numToSys(ag[7])
+                out.append({'name' : ag[0],
+                   'teaser' : ag[1],
+                   'DM' : ag[2],
+                   'style' : ag[3],
+                   'minLevel' : ag[4],
+                   'maxLevel' : ag[5],
+                   'numOfPlayers' : ag[6],
+                   'system' : sys,
+                   'time' : ag[8]}
+                    )
+        return out
+    finally:
+        con.close()
+
+def getAllActive(DB = 1):  #meant to be used to see all tables for administration needs
+    try:
+        con , cursor = connect()
+        q = "SELECT adventureName, teaser, dm , style ,  minLevel , maxLevel, numOfPlayers, system, time  FROM " + bases[DB] + " WHERE active = %s ORDER BY minLevel"
+        cursor.execute(q , [1]);
+        ActiveGames = cursor.fetchall();
+        out = []
+        for ag in ActiveGames:
+            if ag[7] == "1":
+                out.append({'name' : ag[0],
+                   'teaser' : ag[1],
+                   'DM' : ag[2],
+                   'style' : ag[3],
+                   'minLevel' : ag[4],
+                   'maxLevel' : ag[5],
+                   'numOfPlayers' : ag[6],
+                   'system' : "D&D5",
+                   'time' : ag[8]}
+                   )
+            else:
+                sys = numToSys(ag[7])
+                out.append({'name' : ag[0],
+                   'teaser' : ag[1],
+                   'DM' : ag[2],
+                   'style' : ag[3],
+                   'minLevel' : ag[4],
+                   'maxLevel' : ag[5],
+                   'numOfPlayers' : ag[6],
+                   'system' : sys,
+                   'time' : ag[8]}
+                    )
+        return out
+    finally:
+        con.close()
+
+
+def getTableByDM (name, DB = 1):
+    con , cursor = connect()
+    q = "SELECT adventureName, teaser , system, time FROM " + bases[DB] + " WHERE dm = %s AND active = %s "
+    cursor.execute(q , [name , 1]);
+    gamesByDM =cursor.fetchall();
+    out = []
+    for row in gamesByDM:
+        sys = numToSys(row[2])
+        out.append({'name' : row[0],
+            'teaser' : row[1],
+            'system' : sys,
+            'time' : row[3]}
+            )
+
+    con.close()
+    return out
+
+
+def getPlayersListByDm (name , DB = 1):
+    con , cursor = connect()
+    q = "SELECT playersList , charactersLevel , numOfPlayers, time FROM " + bases[DB] + " WHERE dm = %s AND active = %s"
+    cursor.execute(q , [name , 1]);
+    data = cursor.fetchall()
+    if len(data) == 0:
+        out = "השולחן שחיפשת אינו רשום במאגר, אנא וודא את שם השולחן ושאתה מחפש במאגר הנכון"
+        return out
+    list = data[0][0]
+    levels = data[0][1]
+    num = data[0][2]
+    time = data [0][3]
+    listBreakDown = list.split('|')
+    levelsBreakDown = levels.split('|')
+    i = 0
+    out = ""
+    while i < num:
+        out += "player " + str((i+1)) + ": " + listBreakDown[i] +" , level: " +levelsBreakDown[i] + " , time: " + time +"<br>"
+        i+=1
+    con.close()
+    return out
+
+
+def getPlayersListByTableName (name , DB = 1):
+    con , cursor = connect()
+    q = "SELECT playersList , charactersLevel , numOfPlayers, time FROM " + bases[DB] + " WHERE adventureName = %s"
+    cursor.execute( q , [name]);
+    data = cursor.fetchall()
+    if len(data) == 0:
+        out = "השולחן שחיפשת אינו רשום במאגר, אנא וודא את שם השולחן ושאתה מחפש במאגר הנכון"
+        return out
+    list = data[0][0]
+    levels = data[0][1]
+    num = data[0][2]
+    time = data[0][3]
+    listBreakDown = list.split('|')
+    levelsBreakDown = levels.split('|')
+    i = 0
+    out = ""
+    while i < num:
+        out += "player " + str((i+1)) + ": " + listBreakDown[i] +" , level: " +levelsBreakDown[i] + " , time: " + str(time) +"<br>"
+        i+=1
+    con.close()
+    print (out)
+    return out
+
+def getAllPlayers(DB =1 ):
+    con , cursor = connect()
+    q = "SELECT adventureName , playersList , numOfPlayers FROM " + bases[DB] + " WHERE active = %s "
+    cursor.execute(q, [1]);
+    data = cursor.fetchall()
+    tables = []
+    for t in data:
+        tables.append(t)
+    out = []
+    for table in tables:
+        name = table[0]
+        players = table[1].split('|')
+        num = table[2]
+        i = 0
+        text = "ההרפתקאה "  + name + ":"  + "<br>" + "השחקנים: "
+        while i <= num:
+            text += players[i] + "<br>"
+            i += 1
+        out.append(text)
+    con.close()
+    return out
+
+
+def getTableByDmName(name, DB = 1):
+    con , cursor = connect()
+    q = "SELECT adventureName , dm , teaser, style,system, minLevel, maxLevel , time FROM " + bases[DB] + " WHERE dm = %s"
+    cursor.execute( q , [name]);
+    table = cursor.fetchall()
+    out = []
+    for t in table:
+        sys = numToSys(t[4])
+        out.append({'name' : t[0],
+           'dm' : t[1],
+           'teaser' : t[2],
+           'style' : t[3],
+           'system' : sys,
+           'minLevel' : t[5],
+           'maxLevel' : t[6],
+           'time': t[7]}
+           )
+    con.close()
+    return out
+
+def getTableDmAndNum(tableName, DB = 1):
+    con , cursor = connect()
+    q = "SELECT  dm, tableNum FROM " + bases[DB] + " WHERE dm = %s"
+    cursor.execute( q , [tableName]);
+    table = cursor.fetchall()
+    out = []
+    for i in table:
+        out.append({'dm' : i[0],
+            'num' : i[1]}
+            )
+    con.close()
+    return out
+
+def returnTableNum(tableName, DB = 1):
+    con , cursor = connect()
+    q = "SELECT tableNum FROM " + bases[DB] + " WHERE dm = %s"
+    cursor.execute( q , [tableName]);
+    table = cursor.fetchall()
+    out = table[0][0]
+    con.close()
+    return out
+
+###preGame function###
+
+def addTable (name , dm , teaser , style , system , minLevel , maxLevel , password , time , DB = 1 ):
+    if system == "D&D5": #Need to remember, i cant get a number yet - so i am getting the name of the system from yotma.
+        num = sysToNum(system)
+        out = addTableDnd (DB, name , dm , teaser , style , minLevel , maxLevel , password, time)
+    else:
+        addSystem(system)
+        num = sysToNum(system)
+        out = addTableNotDnd (DB,name , dm , teaser ,style , num , password, time)
+    return out
+
+
+def addTableDnd (DB , name , dm , teaser , style , minLevel , maxLevel , password, time):
+    con , cursor = connect()
+    if password == ...:
+        q = "SELECT * FROM " + bases[DB] + " WHERE adventureName = %s "
+        cursor.execute(q , [name])
+        check = cursor.fetchall()
+        if len(check) == 0:
+            if minLevel > maxLevel:
+                minLevel, maxLevel = maxLevel, minLevel
+            q = "INSERT INTO " + bases[DB] + " (adventureName, dm , teaser , style , system ,minLevel , maxLevel , active, isFull ,numOfPlayers , playersList ,charactersLevel ,time ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s ,%s,%s)"
+            cursor.execute( q , [name , dm , teaser , style, 1 ,minLevel , maxLevel , 1 ,0 , 0 , "none", "none" , time])
+            con.commit();
+            isSuccessful = True
+            msg = "השולחן נרשם בהצלחה" + "\n" + "The table has been register"
+        else:
+            isSuccessful = False
+            msg = "קיים שולחן במאגר בעל שם זהה, אנא בחר.י שם אחר" + "\n" + "The table name is already in use, please choose a diffrent name"
+    else:
+        isSuccessful = False
+        msg = "הסיסמה אינה נכונה, אנא נסה או נסי שנית" + "\n" +  "incorrect password, please try again"
+    out = [isSuccessful , msg]
+    con.close()
+    return out
+
+def addTableNotDnd (DB, name , dm , teaser , style , system , password, time):
+    con , cursor = connect()
+    if password == ...:
+        q = "SELECT * FROM " + bases[DB] + " WHERE adventureName = %s "
+        cursor.execute( q , [name])
+        check = cursor.fetchall()
+        if len(check) == 0:
+            q = "INSERT INTO " + bases[DB] + " (adventureName, dm , teaser , style , system , active, isFull ,numOfPlayers , playersList ,charactersLevel ,time ) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s ,%s,%s)"
+            cursor.execute(q , [name , dm , teaser , style, 1 , 1 ,0 , 0 , "none", "none" , time])
+            con.commit();
+            isSuccessful = True
+            msg = "השולחן נרשם בהצלחה" + "\n" + "The table has been register"
+        else:
+            isSuccessful = False
+            msg = "קיים שולחן במאגר בעל שם זהה, אנא בחר.י שם אחר" + "\n" + "The table name is already in use, please choose a diffrent name"
+    else:
+        isSuccessful = False
+        msg = "הסיסמה אינה נכונה, אנא נסה או נסי שנית" + "\n" +  "incorrect password, please try again"
+    out = [isSuccessful , msg]
+    con.close()
+    return out
+
+
+
+def signPlayer (table, playerName , characterLevel, DB = 1 ):
+    con , cursor = connect()
+    q = "SELECT minLevel , maxLevel , numOfPlayers, system  FROM " + bases[DB] + " WHERE adventureName = %s"
+    cursor.execute( q , [table]);
+    check = cursor.fetchall()
+    if len(check) == 0:
+        isSuccessful = False
+        msg = "השולחן הנבחר אינו פעיל במשחק הקרוב " + " <br> the table you chose isn't active for the up coming game"
+        out= [isSuccessful , msg]
+        return out
+    sys = check[0][3]
+    if (sys == 1):
+        for i in check:
+            min = int(i[0])
+            max = int(i[1])
+            n = i[2]
+        if characterLevel < min or characterLevel > max :
+            isSuccessful = False
+            msg ="דרגת הדמות אינה תואתמת את טווח הדרגות של המשחק" + "<br> your character level is out of the level bound of the adventure you chose"
+            out= [isSuccessful , msg]
+            return out
+    else:
+        n = check[0][2]
+    if n >= 5:
+        isSuccessful = False
+        msg = "השולחן מלא, נא בחר / בחרי שולחן אחר" + "<br> the table is full, please select another table"
+        q = "UPDATE " + bases[DB] + " SET isFull = %s WHERE adventureName = %s"
+        cursor.execute( q , [1 , table])
+        out= [isSuccessful , msg]
+        return out
+    q = "SELECT numOfPlayers FROM " + bases[DB] + " WHERE adventureName = %s AND active = %s"
+    cursor.execute(q , [table , 1]);
+    num = cursor.fetchall()[0][0]
+    q= "SELECT playersList  FROM " + bases[DB] + " WHERE adventureName = %s AND active = %s"
+    cursor.execute(q , [ table , 1]);
+    list = (cursor.fetchall()[0][0])
+    q = "SELECT charactersLevel FROM " + bases[DB] + " WHERE adventureName = %s AND active = %s"
+    cursor.execute(q , [table , 1]);
+    level = (cursor.fetchall()[0][0])
+    if num == 0:
+        num = 1
+        list = playerName + "|"
+        level = str(characterLevel) + "|"
+        isSuccessful = True
+        msg = "הרשמתך התקבלה בהצלחה" + "<br>" + "you have been successfuly registered"
+        out= [isSuccessful , msg]
+    else:
+        num += 1
+        list+= playerName + "|"
+        level+= str(characterLevel) + "|"
+        isSuccessful = True
+        msg = "הרשמתך התקבלה בהצלחה" + "<br>" + "you have been successfuly registered"
+        out= [isSuccessful , msg]
+
+    q = "UPDATE " + bases[DB] + " SET playersList = %s WHERE adventureName = %s"
+    cursor.execute(q , [list , table])
+    q = "UPDATE " + bases[DB] + " SET  charactersLevel = %s WHERE adventureName = %s"
+    cursor.execute( q, [level , table])
+    q = "UPDATE " + bases[DB] + " SET numOfPlayers = %s  WHERE adventureName = %s"
+    cursor.execute( q , [num , table])
+    if num >= 5:
+        q = "UPDATE " + bases[DB] + " SET isFull = %s WHERE adventureName = %s"
+        cursor.execute(q , [1 , table])
+    con.commit()
+    con.close()
+    return out
+
+def updateTable(name, dm , teaser , style ,system,  minLevel, maxLevel, password, time, DB = 1 ):
+    con , cursor = connect()
+    if password == ...:
+        system = sysToNum(system)
+        q = "UPDATE " + bases[DB] + " SET dm = %s , teaser = %s , style = %s ,system = %s , minLevel = %s , maxLevel = %s time = %sWHERE adventureName = %s"
+        cursor.execute(q , [dm , teaser , style ,system, minLevel, maxLevel, time , name])
+        con.commit()
+        isSuccessful = True
+        msg = "השולחן עודכן" + "<br> Table has been updated"
+        out = [isSuccessful , msg]
+    else:
+        isSuccessful = False
+        msg = "סיסמה שגויה, אנסה נסה שנית" + "<br> incorrect password, please try again"
+        out = [isSuccessful, msg]
+    con.close()
+    return out
+
+def iAmOut(DM, DB = 1): # deactive 1 table by dm name
+    con , cursor = connect()
+    q = "SELECT adventureName FROM " + bases[DB] + " WHERE dm = %s AND active = %s"
+    cursor.execute( q , [DM , 1])
+    table = cursor.fetchall()
+    if table == []:
+        isSuccsesful = False
+        msg = "אין שולחן פעיל תחת המנחה הנבחר" + "<br> there is no active table under the dm name"
+    else:
+        q = "UPDATE " + bases[DB] + " SET active = %s WHERE dm = %s AND active = %s"
+        cursor.execute(q , [0 , DM , 1])
+        con.commit()
+        isSuccsesful = True
+        msg = "השולחן מוגדר כלא פעיל" + "<br> the table has been deactiveted"
+    out = [isSuccsesful , msg]
+    con.close()
+    return out
+
+###postGame### function
+
+def GameOver (password, DB =1 ):
+    con , cursor = connect()
+    if password == ...:
+        q = "UPDATE " + bases[DB] + " SET active = %s"
+        cursor.execute(q , [0])
+        con.commit()
+        isSuccsesful = True
+        msg = "כל השולחנות הפכו ללא פעילים" + " all tables are deactived"
+    else:
+        isSuccsesful = False
+        msg = "סיסמא שגויה, אנא נסה שנית" +  "wrong password, try again"
+    out = [isSuccsesful , msg]
+    con.close()
+    return out
